@@ -1,6 +1,7 @@
 import { Form } from "react-router";
 import { MovieCard } from "~/components/MovieCard";
-import { getMovies } from "~/lib/movies";
+import { Pagination } from "~/components/Pagination";
+import { getMovies } from "~/lib/tmdb.server";
 import type { Route } from "./+types/home";
 
 export function meta(): Route.MetaDescriptors {
@@ -8,17 +9,23 @@ export function meta(): Route.MetaDescriptors {
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
-  const q = new URL(request.url).searchParams.get("q") ?? "";
-  return { movies: await getMovies(q), q };
+  const params = new URL(request.url).searchParams;
+  const q = params.get("q") ?? "";
+  const page = Math.max(1, Number(params.get("page")) || 1);
+
+  return { ...(await getMovies(q, page)), q };
 }
 
 export default function Home({ loaderData }: Route.ComponentProps) {
-  const { movies, q } = loaderData;
+  const { results, page, totalPages, q } = loaderData;
 
   return (
-    <section className="space-y-6">
+    <section className="space-y-8">
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-        <h1 className="text-3xl font-bold">Top Movies</h1>
+        <h1 className="text-3xl font-bold">
+          {q ? `Results for "${q}"` : "Popular Movies"}
+        </h1>
+        {/* No page input here, so a new search starts at page 1. */}
         <Form className="w-full sm:w-72">
           <input
             type="search"
@@ -30,15 +37,17 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         </Form>
       </div>
 
-      {movies.length === 0 ? (
-        <p className="text-zinc-400">No movies match "{q}".</p>
+      {results.length === 0 ? (
+        <p className="text-zinc-400">No movies found.</p>
       ) : (
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {movies.map((movie) => (
+        <div className="grid grid-cols-2 gap-6 md:grid-cols-3 lg:grid-cols-4">
+          {results.map((movie) => (
             <MovieCard key={movie.id} movie={movie} />
           ))}
         </div>
       )}
+
+      <Pagination page={page} totalPages={totalPages} />
     </section>
   );
 }
